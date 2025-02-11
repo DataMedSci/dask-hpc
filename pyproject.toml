@@ -2,6 +2,7 @@
 name = "dask_hpc"
 version = "0.1.0"
 description = "Dask configuration for HPC environments"
+authors = []
 readme = "README.md"
 packages = [{include = "dask_hpc"}]
 

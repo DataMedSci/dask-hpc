@@ -1,1 +1,1 @@
-from custom_slurm_cluster import CustomSLURMCluster
+from .custom_slurm_cluster import CustomSLURMCluster
