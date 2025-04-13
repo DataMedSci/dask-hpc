@@ -88,11 +88,11 @@ class CustomSLURMCluster(SLURMCluster):
             return self._setup_poetry_environment(project_dir)
 
         elif env_type == EnvironmentType.CONDA:
-            if not self.conda_env_path:
+            if not conda_env_path:
                 raise ValueError("conda_env_path must be provided when env_type is CONDA")
-            if not os.path.isfile(self.conda_env_path):
+            if not os.path.isfile(conda_env_path):
                 raise FileNotFoundError(f"Conda .sqsh file not found at {conda_env_path}")
-            return self._setup_conda_environment(self.conda_env_path)
+            return self._setup_conda_environment(conda_env_path)
 
         else:
             raise ValueError("env_type must be EnvironmentType.POETRY or EnvironmentType.CONDA")
