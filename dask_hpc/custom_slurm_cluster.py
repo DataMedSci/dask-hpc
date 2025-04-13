@@ -1,9 +1,15 @@
 import getpass
 import os
 import socket
+from enum import Enum
 
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
+
+
+class EnvironmentType(Enum):
+    POETRY = "poetry"
+    CONDA = "conda"
 
 
 class CustomSLURMCluster(SLURMCluster):
@@ -11,6 +17,8 @@ class CustomSLURMCluster(SLURMCluster):
         self,
         account: str,
         project_dir: str,
+        env_type: EnvironmentType = EnvironmentType.POETRY,
+        conda_env_path: str = None,
         cores: int = 1,
         processes: int = 1,
         memory: str = "10GB",
@@ -28,6 +36,8 @@ class CustomSLURMCluster(SLURMCluster):
         Args:
             account (str): SLURM account name.
             project_dir (str): Path to the project directory.
+            env_type (EnvironmentType, optional): Environment type to use: EnvironmentType.POETRY or EnvironmentType.CONDA.
+            conda_env_path (str, optional): Path to the .sqsh conda environment. Required if env_type is CONDA.
             cores (int, optional): Number of CPU cores per job. Defaults to 1.
             processes (int, optional): Number of processes per job. Defaults to 1.
             memory (str, optional): Memory allocated per job. Defaults to "10GB".
@@ -50,8 +60,8 @@ class CustomSLURMCluster(SLURMCluster):
         # Define job submission command via SSH to the login node (sbatch is not available on the compute nodes)
         self.job_cls.submit_command = f"ssh {self.plg_user}@{self.login_node} sbatch"
 
-        # Setup Python environment with Poetry
-        job_script_prologue = self._setup_poetry_environment(project_dir)
+        # Setup environment (Poetry or Conda)
+        job_script_prologue = self._setup_environment(env_type, project_dir, conda_env_path)
 
         super().__init__(
             cores=cores,
@@ -70,16 +80,24 @@ class CustomSLURMCluster(SLURMCluster):
             **kwargs,
         )
 
+    def _setup_environment(self, env_type: EnvironmentType, project_dir: str, conda_env_path: str):
+        if env_type == EnvironmentType.POETRY:
+            pyproject_path = os.path.join(project_dir, "pyproject.toml")
+            if not os.path.isfile(pyproject_path):
+                raise FileNotFoundError(f"pyproject.toml not found in {project_dir}")
+            return self._setup_poetry_environment(project_dir)
+
+        elif env_type == EnvironmentType.CONDA:
+            if not self.conda_env_path:
+                raise ValueError("conda_env_path must be provided when env_type is CONDA")
+            if not os.path.isfile(self.conda_env_path):
+                raise FileNotFoundError(f"Conda .sqsh file not found at {conda_env_path}")
+            return self._setup_conda_environment(self.conda_env_path)
+
+        else:
+            raise ValueError("env_type must be EnvironmentType.POETRY or EnvironmentType.CONDA")
+
     def _setup_poetry_environment(self, project_dir: str):
-        """
-        Configures the Poetry environment in MEMFS.
-
-        Args:
-            project_dir (str): Path to the project directory.
-
-        Returns:
-            list: List of commands to set up Poetry.
-        """
         project_name = os.path.basename(project_dir)
         return [
             "module load poetry/1.8.3-gcccore-12.3.0",
@@ -91,6 +109,21 @@ class CustomSLURMCluster(SLURMCluster):
             f"cd $MEMFS/{project_name}",
             "poetry install --with=dev",
             "source $(poetry env info --path)/bin/activate",
+        ]
+
+    def _setup_conda_environment(self, conda_env_path: str):
+        return [
+            "module load miniconda3",
+            f"SRC_PATH={conda_env_path}",
+            "DEST_PATH=$MEMFS/lgad.sqsh",
+            "ENV_PATH=$MEMFS/envs/lgad",
+            "cp $SRC_PATH $DEST_PATH",
+            "mkdir -p $ENV_PATH",
+            "squashfuse $DEST_PATH $ENV_PATH",
+            "eval $(conda shell.bash hook)",
+            "conda activate $ENV_PATH",
+            "conda config --append envs_dirs $MEMFS/envs",
+            "export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH",
         ]
 
     @property
