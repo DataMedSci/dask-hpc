@@ -122,7 +122,7 @@ class CustomSLURMCluster(SLURMCluster):
             "cp $SRC_PATH $DEST_PATH",
             "mkdir -p $ENV_PATH",
             "squashfuse $DEST_PATH $ENV_PATH",
-            "eval $(conda shell.bash hook)",
+            "source $(dirname $(which conda))/../etc/profile.d/conda.sh",
             "conda activate $ENV_PATH",
             "conda config --append envs_dirs $MEMFS/envs",
             "export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH",
