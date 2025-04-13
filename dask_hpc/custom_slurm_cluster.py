@@ -82,7 +82,8 @@ class CustomSLURMCluster(SLURMCluster):
 
     def _setup_environment(self, env_type: EnvironmentType, project_dir: str, conda_env_path: str):
         if env_type == EnvironmentType.POETRY:
-            pyproject_path = os.path.join(project_dir, "pyproject.toml")
+            resolved_project_dir = os.path.expandvars(project_dir)
+            pyproject_path = os.path.join(resolved_project_dir, "pyproject.toml")
             if not os.path.isfile(pyproject_path):
                 raise FileNotFoundError(f"pyproject.toml not found in {project_dir}")
             return self._setup_poetry_environment(project_dir)
