@@ -61,7 +61,9 @@ class CustomSLURMCluster(SLURMCluster):
         self.job_cls.submit_command = f"ssh {self.plg_user}@{self.login_node} sbatch"
 
         # Setup environment (Poetry or Conda)
-        job_script_prologue = self._setup_environment(env_type, project_dir, conda_env_path)
+        self.project_dir = os.path.expandvars(project_dir)
+        self.conda_env_path = os.path.expandvars(conda_env_path) if conda_env_path else None
+        job_script_prologue = self._setup_environment(env_type, self.project_dir, self.conda_env_path)
 
         super().__init__(
             cores=cores,
@@ -82,8 +84,7 @@ class CustomSLURMCluster(SLURMCluster):
 
     def _setup_environment(self, env_type: EnvironmentType, project_dir: str, conda_env_path: str):
         if env_type == EnvironmentType.POETRY:
-            resolved_project_dir = os.path.expandvars(project_dir)
-            pyproject_path = os.path.join(resolved_project_dir, "pyproject.toml")
+            pyproject_path = os.path.join(project_dir, "pyproject.toml")
             if not os.path.isfile(pyproject_path):
                 raise FileNotFoundError(f"pyproject.toml not found in {project_dir}")
             return self._setup_poetry_environment(project_dir)
